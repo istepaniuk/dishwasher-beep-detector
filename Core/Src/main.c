@@ -32,6 +32,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#undef USE_HAL_ADC_REGISTER_CALLBACKS
+#define  USE_HAL_ADC_REGISTER_CALLBACKS         1U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
