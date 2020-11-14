@@ -98,8 +98,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start(&htim1);
   HAL_TIM_OC_Start(&htim1, TIM_CHANNEL_1);
-  //HAL_ADCEx_Calibration_Start(&hadc1);
-  //HAL_ADC_Start_IT(&hadc1);
+  HAL_ADCEx_Calibration_Start(&hadc1);
 
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*) &ad_sample_buffer[0], 1024);
 
@@ -331,13 +330,13 @@ static void MX_GPIO_Init(void)
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     // Read & Update The ADC Result
-    //uint32_t res = HAL_ADC_GetValue(&hadc1);
-    //uint16_t res = ad_sample_buffer[600];
-    //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-    //for (int i = 0; i < 20000 ; ++i) {
-    //    asm("mov r0,r0"); //noop
-    //}
-    //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+    // uint32_t res = HAL_ADC_GetValue(&hadc1);
+    // uint16_t res = ad_sample_buffer[600];
+    // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+    // for (int i = 0; i < 20000 ; ++i) {
+    //     asm("mov r0,r0"); //noop
+    // }
+    // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
     HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 }
 
