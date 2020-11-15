@@ -36,7 +36,7 @@
 #undef USE_HAL_ADC_REGISTER_CALLBACKS
 #define  USE_HAL_ADC_REGISTER_CALLBACKS         1U
 #define SAMPLING_FREQ 72000
-#define TONE_FREQ 4000
+#define TONE_FREQ 3969
 
 /* USER CODE END PD */
 
@@ -67,7 +67,7 @@ static void MX_TIM3_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define ADC_BUFFER_SIZE 512
+#define ADC_BUFFER_SIZE 1024
 uint16_t ad_sample_buffer[ADC_BUFFER_SIZE];
 /* USER CODE END 0 */
 
@@ -303,7 +303,7 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-float goertzel(uint16_t *buffer, size_t buffer_size, float coeff) {
+double goertzel(uint16_t *buffer, size_t buffer_size, float coeff) {
     short coeff_q14;
     short z, zprev, zprev2;
     int mult, pz;
@@ -315,7 +315,7 @@ float goertzel(uint16_t *buffer, size_t buffer_size, float coeff) {
     zprev2 = 0;
     for (n = 0; n < buffer_size; n++) {
         mult = (int) coeff_q14 * (int) zprev;
-        z = ((buffer[n] - 1375) >> 6) + (mult >> 14) - zprev2;
+        z = ((buffer[n] - 2000) >> 6) + (mult >> 14) - zprev2;
         zprev2 = zprev;
         zprev = z;
     }
@@ -323,25 +323,20 @@ float goertzel(uint16_t *buffer, size_t buffer_size, float coeff) {
     mult = (int) coeff_q14 * (int) zprev;
     pz = zprev2 * zprev2 + zprev * zprev - ((short) (mult >> 14)) * zprev2;
 
-    return (float) pz * pow(2.0, 12);
+    return (double) pz * pow(2.0, 12);
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-    float w = 2.0* M_PI * ((float) TONE_FREQ / SAMPLING_FREQ);
-    float coeff = 2.0* cos(w);
-    float g = goertzel(&ad_sample_buffer[0], ADC_BUFFER_SIZE, coeff);
-    int res = g / 10000 - 10000;
+    float w = 2.0 * M_PI * ((float) TONE_FREQ / SAMPLING_FREQ);
+    float coeff = 2.0 * cos(w);
+    float g = goertzel(&ad_sample_buffer[0], ADC_BUFFER_SIZE, coeff) * 0.001;
 
-    if(res > 1000000){
-        res = 1000000;
+    if(g > 120000){
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+    } else {
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
     }
-
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-    for (int i = 0; i < res ; ++i) {
-         asm("mov r0,r0");
-    }
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
 }
 
 /* USER CODE END 4 */
