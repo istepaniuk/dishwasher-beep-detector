@@ -36,6 +36,7 @@
 #undef USE_HAL_ADC_REGISTER_CALLBACKS
 #define  USE_HAL_ADC_REGISTER_CALLBACKS         1U
 #define SAMPLING_FREQ 72000
+#define TONE_DETECTION_THRESHOLD 50000000
 #define TONE_FREQ 3969
 
 /* USER CODE END PD */
@@ -303,36 +304,40 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-double goertzel(uint16_t *buffer, size_t buffer_size, float coeff) {
-    short coeff_q14;
-    short z, zprev, zprev2;
+double goertzel(uint16_t *buffer, size_t buffer_size, float coefficient)
+{
+    short coefficient_q14;
+    short z, z_prev, z_prev2;
     int mult, pz;
     int n;
 
-    coeff_q14 = (1 << 14) * coeff;
+    coefficient_q14 = (1 << 14) * coefficient;
 
-    zprev = 0;
-    zprev2 = 0;
+    z_prev = 0;
+    z_prev2 = 0;
+
     for (n = 0; n < buffer_size; n++) {
-        mult = (int) coeff_q14 * (int) zprev;
-        z = ((buffer[n] - 2000) >> 6) + (mult >> 14) - zprev2;
-        zprev2 = zprev;
-        zprev = z;
+        mult = (int) coefficient_q14 * (int) z_prev;
+        z = ((buffer[n] - 1250) >> 6) + (mult >> 14) - z_prev2;
+        z_prev2 = z_prev;
+        z_prev = z;
     }
 
-    mult = (int) coeff_q14 * (int) zprev;
-    pz = zprev2 * zprev2 + zprev * zprev - ((short) (mult >> 14)) * zprev2;
+    mult = (int) coefficient_q14 * (int) z_prev;
+    pz = z_prev2 * z_prev2 + z_prev * z_prev - ((short) (mult >> 14)) * z_prev2;
 
     return (double) pz * pow(2.0, 12);
 }
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
+    //TODO: move these constant calculations outside of the ISR
     float w = 2.0 * M_PI * ((float) TONE_FREQ / SAMPLING_FREQ);
-    float coeff = 2.0 * cos(w);
-    float g = goertzel(&ad_sample_buffer[0], ADC_BUFFER_SIZE, coeff) * 0.001;
+    float coefficient = 2.0 * cos(w);
 
-    if(g > 120000){
+    float g = goertzel(&ad_sample_buffer[0], ADC_BUFFER_SIZE, coefficient);
+
+    if (g > TONE_DETECTION_THRESHOLD) {
         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
     } else {
         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
@@ -348,7 +353,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
   while(1){
       HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
       HAL_Delay(1000);
