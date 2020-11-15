@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,7 +63,8 @@ static void MX_TIM3_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint16_t ad_sample_buffer[1024];
+#define ADC_BUFFER_SIZE 512
+uint16_t ad_sample_buffer[ADC_BUFFER_SIZE];
 /* USER CODE END 0 */
 
 /**
@@ -101,7 +102,7 @@ int main(void)
   HAL_TIM_Base_Start(&htim3);
   HAL_ADCEx_Calibration_Start(&hadc1);
 
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*) &ad_sample_buffer[0], 1000);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*) &ad_sample_buffer[0], ADC_BUFFER_SIZE);
 
   /* USER CODE END 2 */
 
@@ -230,7 +231,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 1000;
+  htim3.Init.Period = 10000;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -298,17 +299,46 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+float goertzel(uint16_t *buffer, size_t buffer_size, float coeff) {
+    short coeff_q14;
+    short z, zprev, zprev2;
+    int mult, pz;
+    int n;
+
+    coeff_q14 = (1 << 14) * coeff;
+
+    zprev = 0;
+    zprev2 = 0;
+    for (n = 0; n < buffer_size; n++) {
+        mult = (int) coeff_q14 * (int) zprev;
+        z = ((buffer[n] - 1375) >> 6) + (mult >> 14) - zprev2;
+        zprev2 = zprev;
+        zprev = z;
+    }
+
+    mult = (int) coeff_q14 * (int) zprev;
+    pz = zprev2 * zprev2 + zprev * zprev - ((short) (mult >> 14)) * zprev2;
+
+    return (float) pz * pow(2.0, 12);
+}
+
+#define SAMPLING_FREQ   7200
+#define TONE_FREQ    200
+
+
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-    // Read & Update The ADC Result
-    // uint32_t res = HAL_ADC_GetValue(&hadc1);
-    // uint16_t res = ad_sample_buffer[600];
-    // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-    // for (int i = 0; i < 20000 ; ++i) {
-    //     asm("mov r0,r0"); //noop
-    // }
-    // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+    float w = 2.0* M_PI * ((float) TONE_FREQ / SAMPLING_FREQ);
+    float coeff = 2.0* cos(w);
+    float g = goertzel(&ad_sample_buffer[0], ADC_BUFFER_SIZE, coeff);
+    int res = g / 1000;
+    if(res > 1000000){res = 1000000;}
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+    for (int i = 1000; i < res ; ++i) {
+         asm("mov r0,r0");
+    }
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+    //HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 }
 
 /* USER CODE END 4 */
