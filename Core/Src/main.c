@@ -32,8 +32,12 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
 #undef USE_HAL_ADC_REGISTER_CALLBACKS
 #define  USE_HAL_ADC_REGISTER_CALLBACKS         1U
+#define SAMPLING_FREQ 72000
+#define TONE_FREQ 4000
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -231,7 +235,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 10000;
+  htim3.Init.Period = 1000;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -322,23 +326,22 @@ float goertzel(uint16_t *buffer, size_t buffer_size, float coeff) {
     return (float) pz * pow(2.0, 12);
 }
 
-#define SAMPLING_FREQ   7200
-#define TONE_FREQ    200
-
-
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     float w = 2.0* M_PI * ((float) TONE_FREQ / SAMPLING_FREQ);
     float coeff = 2.0* cos(w);
     float g = goertzel(&ad_sample_buffer[0], ADC_BUFFER_SIZE, coeff);
-    int res = g / 1000;
-    if(res > 1000000){res = 1000000;}
+    int res = g / 10000 - 10000;
+
+    if(res > 1000000){
+        res = 1000000;
+    }
+
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-    for (int i = 1000; i < res ; ++i) {
+    for (int i = 0; i < res ; ++i) {
          asm("mov r0,r0");
     }
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-    //HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 }
 
 /* USER CODE END 4 */
