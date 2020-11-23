@@ -5,6 +5,7 @@ uint16_t ad_sample_buffer[ADC_BUFFER_SIZE];
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 TIM_HandleTypeDef htim3;
+short coefficient_q14;
 
 int main(void) {
     HAL_Init();
@@ -17,31 +18,31 @@ int main(void) {
 
     HAL_ADCEx_Calibration_Start(&hadc1);
 
+    float w = 2.0 * M_PI * ((float) TONE_FREQ / SAMPLING_FREQ);
+    float coefficient = 2.0 * cos(w);
+    coefficient_q14 = (1 << 14) * coefficient;
+
     while (1) {
         //All the magic happens in the DMA interrupt.
     }
 }
 
-static double goertzel(uint16_t *buffer, size_t buffer_size, float coefficient) {
-    short coefficient_q14;
+static double goertzel(uint16_t *buffer) {
     short z, z_prev, z_prev2;
-    int mult, pz;
-    int n;
-
-    coefficient_q14 = (1 << 14) * coefficient;
+    int product, pz;
 
     z_prev = 0;
     z_prev2 = 0;
 
-    for (n = 0; n < buffer_size; n++) {
-        mult = (int) coefficient_q14 * (int) z_prev;
-        z = ((buffer[n] - 1250) >> 6) + (mult >> 14) - z_prev2;
+    for (int n = 0; n < ADC_BUFFER_SIZE; n++) {
+        product = (int) coefficient_q14 * (int) z_prev;
+        z = ((buffer[n] - 1250) >> 6) + (product >> 14) - z_prev2;
         z_prev2 = z_prev;
         z_prev = z;
     }
 
-    mult = (int) coefficient_q14 * (int) z_prev;
-    pz = z_prev2 * z_prev2 + z_prev * z_prev - ((short) (mult >> 14)) * z_prev2;
+    product = (int) coefficient_q14 * (int) z_prev;
+    pz = z_prev2 * z_prev2 + z_prev * z_prev - ((short) (product >> 14)) * z_prev2;
 
     return (double) pz * pow(2.0, 12);
 }
@@ -148,11 +149,7 @@ static void MX_GPIO_Init(void) {
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
-    //TODO: move these constant calculations outside of the ISR
-    float w = 2.0 * M_PI * ((float) TONE_FREQ / SAMPLING_FREQ);
-    float coefficient = 2.0 * cos(w);
-
-    float g = goertzel(&ad_sample_buffer[0], ADC_BUFFER_SIZE, coefficient);
+    float g = goertzel(&ad_sample_buffer[0]);
 
     if (g > TONE_DETECTION_THRESHOLD) {
         HAL_GPIO_WritePin(GPIOC, GPIO_LED, GPIO_PIN_RESET);

@@ -24,7 +24,7 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM3_Init(void);
-static double goertzel(uint16_t *buffer, size_t buffer_size, float coefficient);
+static double goertzel(uint16_t *buffer);
 void Error_Handler(void);
 
 #endif
